@@ -1,0 +1,1577 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>صيدلية البلد بإدارة إياس ود. أسيل (أم ورد)</title>
+    <!-- مكتبات Firebase للمزامنة اللحظية -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <style>
+        :root {
+            --primary: #1e293b;
+            --secondary: #0f766e;
+            --accent: #2563eb;
+            --bg: #f1f5f9;
+            --card-bg: #ffffff;
+            --text: #0f172a;
+            --border: #cbd5e1;
+        }
+
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, sans-serif; }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 15px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .main-container {
+            width: 100%;
+            max-width: 1200px;
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        .top-bar {
+            background: var(--primary);
+            color: #fff;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .top-bar h2 { margin: 0; font-size: 18px; }
+
+        .dashboard-nav {
+            display: flex;
+            gap: 10px;
+            background: #e2e8f0;
+            padding: 8px;
+            border-bottom: 1px solid var(--border);
+            flex-wrap: wrap;
+        }
+
+        .nav-tab {
+            padding: 10px 18px;
+            border: none;
+            background: transparent;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 6px;
+            color: var(--text);
+        }
+
+        .nav-tab.active { background: var(--secondary); color: white; }
+
+        .content-area { padding: 20px; }
+
+        .clock-display {
+            background: #f8fafc;
+            color: #0284c7;
+            font-family: 'Courier New', monospace;
+            font-size: 28px;
+            font-weight: bold;
+            text-align: center;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border: 2px solid #bae6fd;
+        }
+
+        .card {
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 18px;
+            margin-bottom: 15px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            margin-top: 5px;
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+
+        .btn {
+            padding: 8px 14px;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .btn-success { background: #16a34a; color: white; }
+        .btn-danger { background: #dc2626; color: white; }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-warning { background: #d97706; color: white; }
+        .btn-dark { background: #334155; color: white; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid var(--border); padding: 8px; text-align: center; font-size: 13px; vertical-align: top; }
+        th { background: #f8fafc; color: var(--primary); font-weight: bold; }
+
+        /* جدول مهام الموظف (20 مهمة على اليمين وبجانبها مربع صح) */
+        .emp-tasks-table th { background: #0f766e; color: #fff; }
+        .emp-tasks-table td { text-align: right; padding: 9px 12px; line-height: 1.5; }
+        .emp-tasks-table td.check-col { text-align: center; width: 85px; }
+        .emp-tasks-table input[type="checkbox"] { width: 20px; height: 20px; cursor: pointer; }
+
+        .summary-box {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            color: #166534;
+        }
+
+        .points-badge {
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fde68a;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-weight: bold;
+            font-size: 12px;
+            display: inline-block;
+        }
+
+        .status-badge-match {
+            background: #dcfce7;
+            color: #15803d;
+            border: 1px solid #86efac;
+            padding: 2px 6px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 11px;
+            display: inline-block;
+        }
+
+        .status-badge-mismatch {
+            background: #fee2e2;
+            color: #b91c1c;
+            border: 1px solid #fca5a5;
+            padding: 2px 6px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 11px;
+            display: inline-block;
+        }
+
+        /* تقسيم يمين وشمال في بوابة الإدارة: جدول المهمات يمين + تقييم إياس ود. أسيل شمال */
+        .admin-split-wrap {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            justify-content: space-between;
+            text-align: right;
+            flex-wrap: wrap;
+        }
+
+        .admin-tasks-right {
+            flex: 1.8;
+            min-width: 260px;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            background: #f8fafc;
+        }
+
+        .admin-tasks-right table { margin-top: 0; }
+        .admin-tasks-right td { font-size: 12px; padding: 6px 8px; text-align: right; line-height: 1.5; }
+        .admin-tasks-right td.st-cell { text-align: center; width: 65px; font-weight: bold; }
+
+        .admin-eval-left {
+            flex: 1.2;
+            min-width: 210px;
+            max-width: 270px;
+            background: #fffbeb;
+            border: 1.5px solid #f59e0b;
+            border-radius: 6px;
+            padding: 8px;
+            text-align: right;
+        }
+
+        .admin-eval-title {
+            font-size: 12px;
+            font-weight: bold;
+            color: #92400e;
+            margin-bottom: 6px;
+            text-align: center;
+            background: #fef3c7;
+            padding: 4px;
+            border-radius: 4px;
+        }
+
+        .per-task-eval-list {
+            max-height: 175px;
+            overflow-y: auto;
+            border: 1px solid #fde68a;
+            border-radius: 4px;
+            background: #ffffff;
+            padding: 5px;
+            margin-bottom: 6px;
+        }
+
+        .per-task-eval-row {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-bottom: 5px;
+            padding-bottom: 4px;
+            border-bottom: 1px dashed #e2e8f0;
+            font-size: 11px;
+        }
+
+        .per-task-score {
+            width: 44px;
+            padding: 3px;
+            border: 1px solid #d97706;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .per-task-note {
+            flex: 1;
+            padding: 3px 5px;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            font-size: 11px;
+        }
+
+        .final-avg-box {
+            background: #ecfdf5;
+            border: 1px solid #6ee7b7;
+            border-radius: 5px;
+            padding: 6px;
+            margin-bottom: 6px;
+            font-size: 12px;
+            color: #065f46;
+            font-weight: bold;
+        }
+
+        .mini-note-input {
+            width: 100%;
+            padding: 5px;
+            border: 1px solid #d97706;
+            border-radius: 5px;
+            font-size: 12px;
+            margin-bottom: 6px;
+        }
+
+        /* طباعة حرارية بخط أسود داكن جداً (900) وحدود كاملة لا تقتطع العمود الأخير */
+        #printable-receipt { display: none; }
+        @media print {
+            @page {
+                size: auto;
+                margin: 2mm;
+            }
+            html, body {
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: #fff !important;
+                color: #000 !important;
+                overflow: visible !important;
+            }
+            body * { visibility: hidden; }
+            #printable-receipt, #printable-receipt * {
+                visibility: visible !important;
+                color: #000 !important;
+                font-weight: 900 !important;
+                box-sizing: border-box !important;
+            }
+            #printable-receipt {
+                display: block !important;
+                position: static !important;
+                width: 100% !important;
+                max-width: 74mm !important;
+                margin: 0 auto !important;
+                padding: 2mm 1mm !important;
+                color: #000 !important;
+                background: #fff !important;
+                font-size: 11px !important;
+                font-weight: 900 !important;
+                direction: rtl !important;
+                text-align: center !important;
+            }
+            #printable-receipt table {
+                width: 100% !important;
+                max-width: 100% !important;
+                table-layout: fixed !important;
+                border-collapse: collapse !important;
+                margin-top: 4px !important;
+                border: 1.5px solid #000 !important;
+            }
+            #printable-receipt th, #printable-receipt td {
+                border: 1.5px solid #000 !important;
+                padding: 2.5px 2px !important;
+                text-align: right !important;
+                font-size: 9.5px !important;
+                font-weight: 900 !important;
+                color: #000 !important;
+                line-height: 1.3 !important;
+                vertical-align: middle !important;
+                overflow-wrap: anywhere !important;
+                word-break: break-word !important;
+            }
+            #printable-receipt th {
+                background: #e5e7eb !important;
+                text-align: center !important;
+                font-size: 9.5px !important;
+                font-weight: 900 !important;
+            }
+            #printable-receipt hr { border: none; border-top: 1.5px dashed #000; margin: 4px 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="main-container">
+    <div class="top-bar">
+        <h2>💊 صيدلية البلد بإدارة إياس ود. أسيل (أم ورد) - نظام إدارة الشفتات والكاش</h2>
+        <span>إشراف د. إياس ود. أسيل (أم ورد)</span>
+    </div>
+
+    <div class="dashboard-nav">
+        <button class="nav-tab active" onclick="switchTab('shift-tab', event)">🕒 تسجيل الدوام والكاش</button>
+        <button class="nav-tab" onclick="switchTab('statement-tab', event)">📜 كشف حساب الموظف</button>
+        <button class="nav-tab" onclick="switchTab('admin-tab', event)">🔒 بوابة الإدارة (إياس + د. أسيل أم ورد)</button>
+    </div>
+
+    <div class="content-area">
+        <div class="clock-display" id="liveClock">00:00:00</div>
+
+        <!-- 1. تسجيل الدوام -->
+        <div id="shift-tab" class="tab-content">
+            <div class="card">
+                <h3>تسجيل حضور الدوام وبداية الشفت</h3>
+                <label>اختر الموظف:</label>
+                <select id="empSelect" class="form-control" onchange="handleEmpChange()"></select>
+
+                <div id="newStaffBox" style="display:none; background:#f0f9ff; padding:12px; border-radius:8px; border:1px solid #bae6fd; margin-bottom:12px;">
+                    <h4 style="margin:0 0 8px 0; color:#0369a1;">إضافة موظف جديد للسيستم:</h4>
+                    <label>اسم الموظف الجديد:</label>
+                    <input type="text" id="newEmpName" class="form-control" placeholder="مثال: سارة">
+                    <label>أجر الساعة (شيكل):</label>
+                    <input type="number" id="newEmpRate" class="form-control" value="15" placeholder="مثال: 15">
+                    <label>الرمز السري الخاص به:</label>
+                    <input type="password" id="newEmpPin" class="form-control" placeholder="رمز الدخول الخاص به">
+                    <button class="btn btn-primary" style="width:100%; margin-top:5px;" onclick="addNewStaffMember()">💾 حفظ الموظف الجديد في السيستم</button>
+                </div>
+
+                <label>الرمز السري:</label>
+                <input type="password" id="empPin" class="form-control" placeholder="أدخل الرقم السري">
+
+                <div id="startCashBox">
+                    <label>💵 بداية الكاش عند الاستلام (شيكل):</label>
+                    <input type="number" id="startCash" class="form-control" placeholder="مثال: 100">
+                </div>
+
+                <div id="statusBadge" style="display:none; padding:10px; background:#e0f2fe; border-radius:6px; font-weight:bold; margin-bottom:12px;"></div>
+
+                <div style="display:flex; gap:10px;">
+                    <button id="btnIn" class="btn btn-success" style="flex:1;" onclick="clockIn()">تسجيل دخول + بدء الوردية ➔</button>
+                </div>
+            </div>
+
+            <!-- جدول المهام (20 مهمة) على اليمين وبجانبه مربع صح فقط -->
+            <div id="tasks-section" class="card" style="display:none;">
+                <h3>📋 جدول المهام اليومية المطلوبة خلال الوردية (20 مهمة)</h3>
+                <div style="max-height: 420px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px;">
+                    <table class="emp-tasks-table" style="margin-top:0;">
+                        <thead>
+                            <tr>
+                                <th style="width:50px;">#</th>
+                                <th style="text-align:right;">المهمة المطلوبة</th>
+                                <th style="width:85px;">تم التنفيذ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tasksTableBody"></tbody>
+                    </table>
+                </div>
+
+                <hr style="margin:20px 0; border:none; border-top:1px solid #cbd5e1;">
+
+                <h3 style="color:#dc2626;">💵 نهاية الشفت وتسليم الكاش والفيزا والمصروفات</h3>
+
+                <label style="color:#dc2626; font-weight:bold;">💵 الكاش النقدي الموجود بالصندوق/الجارور عند التسليم (شيكل):</label>
+                <input type="number" id="endCash" class="form-control" placeholder="مثال: 400">
+
+                <label style="color:#0284c7; font-weight:bold; margin-top:8px; display:block;">💳 مبيعات الفيزا / الدفع الإلكتروني (شيكل):</label>
+                <input type="number" id="visaCash" class="form-control" placeholder="أدخل 0 إذا لم توجد فيزا">
+
+                <label style="color:#d97706; font-weight:bold; margin-top:8px; display:block;">🧾 المصروفات والنثريات خلال الوردية (كهرباء/إيجار/ضيافة) (شيكل):</label>
+                <input type="number" id="expenditureCash" class="form-control" placeholder="أدخل 0 إذا لم توجد مصروفات">
+
+                <label style="margin-top:8px; display:block;">📊 مطابقة الكاش مع الجرد:</label>
+                <select id="cashMatchStatus" class="form-control">
+                    <option value="مطابق ✅">مطابق ✅</option>
+                    <option value="غير مطابق ❌">غير مطابق ❌</option>
+                </select>
+
+                <label style="margin-top:8px; display:block;">📝 تفاصيل وبيان المصروفات والملاحظات:</label>
+                <input type="text" id="shiftNotes" class="form-control" placeholder="مثال: شحن كهرباء 90 ₪ + ضيافة قهوة 10 ₪">
+
+                <button class="btn btn-primary" style="width:100%; margin-top:10px; font-size:16px;" onclick="submitCheckOut()">💾 إنهاء الوردية والمزامنة والإرسال لد. أسيل</button>
+            </div>
+        </div>
+
+        <!-- 2. كشف حساب الموظف -->
+        <div id="statement-tab" class="tab-content" style="display:none;">
+            <div class="card">
+                <h3>📜 كشف حساب وتقرير الموظف</h3>
+                <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
+                    <select id="stmtEmpSelect" class="form-control" style="width:200px;" onchange="renderStatement()"></select>
+                    <input type="date" id="stmtStartDate" class="form-control" style="width:160px;" onchange="renderStatement()">
+                    <input type="date" id="stmtEndDate" class="form-control" style="width:160px;" onchange="renderStatement()">
+                    <button class="btn btn-primary" onclick="renderStatement()">عرض كشف الحساب</button>
+                </div>
+            </div>
+
+            <div class="summary-box" id="stmtSummaryBox"></div>
+
+            <div class="card">
+                <h4>📋 تفاصيل ورديات الدوام والكاش المنجزة:</h4>
+                <div style="overflow-x:auto;">
+                    <table id="stmtLogsTable">
+                        <thead>
+                            <tr>
+                                <th>التاريخ</th>
+                                <th>الدخول / الخروج</th>
+                                <th>بداية الكاش</th>
+                                <th>الكاش + الفيزا + المصروفات</th>
+                                <th>إجمالي التسليم</th>
+                                <th>مطابقة الكاش</th>
+                                <th>المستحق</th>
+                                <th>المهام وتقييم الإدارة</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card">
+                <h4>💵 سجل السلف وسندات الصرف المالي:</h4>
+                <div style="overflow-x:auto;">
+                    <table id="stmtPayoutsTable">
+                        <thead>
+                            <tr>
+                                <th>التاريخ</th>
+                                <th>المبلغ المصروف</th>
+                                <th>البيان</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. بوابة الإدارة (إياس + د. أسيل أم ورد) -->
+        <div id="admin-tab" class="tab-content" style="display:none;">
+            <div id="admin-login-box" class="card">
+                <h3>دخول بوابة الإدارة (إياس ود. أسيل أم ورد)</h3>
+                <label>كلمة مرور الإدارة:</label>
+                <input type="password" id="adminPin" class="form-control" placeholder="أدخل رمز الإدارة">
+                <button class="btn btn-primary" onclick="verifyAdmin()">دخول الإدارة</button>
+            </div>
+
+            <div id="admin-dashboard-content" style="display:none;">
+                <div class="card" style="background:#f8fafc;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <h3>📊 تقارير الإدارة المباشرة (إياس ود. أسيل أم ورد)</h3>
+                        <button class="btn btn-danger" onclick="closeAdmin()">❌ خروج من الإدارة</button>
+                    </div>
+
+                    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
+                        <select id="filterEmp" class="form-control" style="width:250px;" onchange="renderDashboard()"></select>
+                        <input type="date" id="startDate" class="form-control" style="width:160px;" onchange="renderDashboard()">
+                        <input type="date" id="endDate" class="form-control" style="width:160px;" onchange="renderDashboard()">
+                        <button class="btn btn-primary" onclick="renderDashboard()">عرض التقرير تفصيلياً</button>
+                    </div>
+                </div>
+
+                <div class="summary-box" id="summaryBox"></div>
+
+                <!-- قسم إدارة الموظفين -->
+                <div class="card" style="background:#fffbe0; border:1px solid #fef08a;">
+                    <h4>⚙️ إدارة الموظفين (تعديل الأجر / حذف موظف):</h4>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                        <select id="manageEmpSelect" class="form-control" style="width:200px;"></select>
+                        <input type="number" id="updateRateValue" class="form-control" placeholder="سعر الساعة الجديد" style="width:160px;">
+                        <button class="btn btn-warning" onclick="updateEmployeeRate()">💾 حفظ السعر</button>
+                        <button class="btn btn-danger" onclick="deleteEmployee()">❌ حذف الموظف نهائياً</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h4>💵 إضافة وتثبيت سند صرف مالي / سلفة</h4>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                        <input type="number" step="0.01" id="payoutAmount" class="form-control" placeholder="المبلغ بالشيكل" style="max-width:200px;">
+                        <input type="text" id="payoutNote" class="form-control" placeholder="البيان والتفاصيل" style="flex:1;">
+                        <button class="btn btn-success" onclick="addPayout()">حفظ وتثبيت السند</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h4>📝 سجل الدوام والكاش: المهام المنجزة (يمين) + تقييم إياس ود. أسيل من 10 والمتوسط الحسابي (شمال):</h4>
+                    <div style="overflow-x:auto;">
+                        <table id="logsTable">
+                            <thead>
+                                <tr>
+                                    <th>التاريخ</th>
+                                    <th>الموظف</th>
+                                    <th>الدخول / الخروج</th>
+                                    <th>بداية الكاش</th>
+                                    <th>الكاش + الفيزا + المصروفات</th>
+                                    <th>إجمالي التسليم</th>
+                                    <th>مطابقة الكاش</th>
+                                    <th>المستحق</th>
+                                    <th>النقاط</th>
+                                    <th style="min-width:520px;">المهام الـ 20 (يمين) + تقييم إياس ود. أسيل والمتوسط (شمال)</th>
+                                    <th>الإجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h4>💵 سجل سندات الصرف المالي:</h4>
+                    <div style="overflow-x:auto;">
+                        <table id="payoutsTable">
+                            <thead>
+                                <tr>
+                                    <th>التاريخ</th>
+                                    <th>الموظف</th>
+                                    <th>المبلغ المصروف</th>
+                                    <th>البيان</th>
+                                    <th>الإجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="printable-receipt"></div>
+
+<script>
+    const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycb7sufQxPHmHz9SxXuBrwy74unY_KDRHsyo-QT7BKW5BKA6AZQ8eR0z2P3civuWBA/exec";
+
+    const firebaseConfig = {
+        databaseURL: "https://pharmacy-f0043-default-rtdb.firebaseio.com"
+    };
+
+    let db = null;
+    if (firebaseConfig.databaseURL && !firebaseConfig.databaseURL.includes("YOUR_DATABASE_NAME")) {
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.database();
+    }
+
+    const TASKS = [
+        "تنظيف والمحافظة على\nنظافة الصيدلية العام",
+        "تفقد الإكسباير\nبشكل دوري",
+        "ترتيب الأدوية\nوالرفوف",
+        "تنظيف وتطوير\nالصيدلية بشكل عام",
+        "متابعة الإكسبايرات\nحسب نظام الثلاث شهور",
+        "تطبيق نظام صرف\nالأقرب تاريخاً FEFO",
+        "تنظيف الحمام\nوتطهيره",
+        "تنظيف واجهة وباب\nالصيدلية الزجاجي",
+        "ترتيب أدوية الثلاجة\nوتسجيل الحرارة",
+        "مراجعة النواقص\nوتسجيلها",
+        "ترتيب الرفوف\nالأمامية والعروض",
+        "التأكد من إغلاق\nالنوافذ والأبواب",
+        "جرد المبيعات\nاليومية وتطابقها",
+        "تنظيف الطاولات\nوأجهزة الكومبيوتر",
+        "ترتيب المستودع\nالخلفي",
+        "تفريغ سلات\nالمهملات",
+        "تفقد مستلزمات\nالإسعافات الأولية",
+        "متابعة طلبات\nالزبائن الخاصة",
+        "تنسيق الأدوية\nالبديلة المتوفرة",
+        "إيقاف تشغيل الأجهزة\nغير الضرورية عند الخروج"
+    ];
+
+    /* رقم واتساب د. أسيل (أم ورد) حصرياً */
+    const PHONE_ASEEL_ADMIN = "972599872113";
+
+    const DEFAULT_PINS = {
+        'أسيل': '1089',
+        'ديما': '33',
+        'أم وتين': '11',
+        'إيمان': '22',
+        'خليل': '55',
+        'إياس': '44',
+        'سارة': '66',
+        'admin': '123459'
+    };
+
+    const DEFAULT_RATES = {
+        'أسيل': 20,
+        'ديما': 15,
+        'أم وتين': 15,
+        'إيمان': 15,
+        'خليل': 15,
+        'إياس': 20,
+        'سارة': 15
+    };
+
+    let PINS = JSON.parse(localStorage.getItem('v7_PINS')) || DEFAULT_PINS;
+    let RATES = JSON.parse(localStorage.getItem('v7_RATES')) || DEFAULT_RATES;
+
+    /* ضمان تحديث كلمة سر الإدارة وأسماء الموظفين الأساسيين */
+    PINS['admin'] = '123459';
+    if (!PINS['أسيل']) PINS['أسيل'] = '1089';
+    if (!PINS['ديما']) PINS['ديما'] = '33';
+    if (!RATES['ديما']) RATES['ديما'] = 15;
+    if (!PINS['أم وتين']) PINS['أم وتين'] = '11';
+    if (!RATES['أم وتين']) RATES['أم وتين'] = 15;
+    if (!PINS['خليل']) PINS['خليل'] = '55';
+    if (!RATES['خليل']) RATES['خليل'] = 15;
+    if (!PINS['إياس']) PINS['إياس'] = '44';
+    if (!RATES['إياس']) RATES['إياس'] = 20;
+    if (!PINS['سارة']) PINS['سارة'] = '66';
+    if (!RATES['سارة']) RATES['سارة'] = 15;
+
+    function formatTwoLinesHtml(text) {
+        return String(text || '').replace(/\n/g, '<br>');
+    }
+
+    function formatTaskLinesHtml(rawText, taskIndex) {
+        const cleaned = String(rawText || '').replace(/^\d+\.\s*/, '').trim();
+        if (typeof taskIndex === 'number' && TASKS[taskIndex]) {
+            return formatTwoLinesHtml(TASKS[taskIndex]);
+        }
+        const matchedTask = TASKS.find(t => formatSingleLineText(t) === cleaned);
+        if (matchedTask) {
+            return formatTwoLinesHtml(matchedTask);
+        }
+        const words = cleaned.split(/\s+/);
+        if (words.length >= 3) {
+            const mid = Math.ceil(words.length / 2);
+            return words.slice(0, mid).join(' ') + '<br>' + words.slice(mid).join(' ');
+        }
+        return cleaned;
+    }
+
+    function formatSingleLineText(text) {
+        return String(text || '').replace(/\n+/g, ' ').trim();
+    }
+
+    function saveStaffMeta() {
+        localStorage.setItem('v7_PINS', JSON.stringify(PINS));
+        localStorage.setItem('v7_RATES', JSON.stringify(RATES));
+        if (db) {
+            db.ref('meta/PINS').set(PINS);
+            db.ref('meta/RATES').set(RATES);
+        }
+    }
+
+    function syncFromCloud() {
+        if (db) {
+            db.ref('meta/PINS').on('value', snap => {
+                if (snap.exists()) {
+                    PINS = Object.assign({}, DEFAULT_PINS, snap.val());
+                    PINS['admin'] = '123459';
+                    localStorage.setItem('v7_PINS', JSON.stringify(PINS));
+                    updateEmpDropdowns();
+                }
+            });
+            db.ref('meta/RATES').on('value', snap => {
+                if (snap.exists()) {
+                    RATES = Object.assign({}, DEFAULT_RATES, snap.val());
+                    localStorage.setItem('v7_RATES', JSON.stringify(RATES));
+                }
+            });
+            db.ref('shifts').on('value', snap => {
+                if (snap.exists()) {
+                    localStorage.setItem('v7_shifts', JSON.stringify(snap.val()));
+                    checkStatus();
+                }
+                if (document.getElementById('admin-dashboard-content').style.display === 'block') renderDashboard();
+                if (document.getElementById('statement-tab').style.display === 'block') renderStatement();
+            });
+            db.ref('logs').on('value', () => {
+                if (document.getElementById('admin-dashboard-content').style.display === 'block') renderDashboard();
+                if (document.getElementById('statement-tab').style.display === 'block') renderStatement();
+            });
+            db.ref('payouts').on('value', () => {
+                if (document.getElementById('admin-dashboard-content').style.display === 'block') renderDashboard();
+                if (document.getElementById('statement-tab').style.display === 'block') renderStatement();
+            });
+        }
+    }
+
+    function updateClock() {
+        document.getElementById('liveClock').innerText = new Date().toLocaleTimeString('ar-EG');
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    /* بناء جدول المهام للموظف (رقم + اسم المهمة على سطرين يمين + مربع صح شمال) */
+    const tasksTableBody = document.getElementById('tasksTableBody');
+    TASKS.forEach((t, i) => {
+        tasksTableBody.innerHTML += `
+            <tr>
+                <td style="text-align:center; font-weight:bold;">${i + 1}</td>
+                <td>${formatTwoLinesHtml(t)}</td>
+                <td class="check-col"><input type="checkbox" id="task_${i}"></td>
+            </tr>
+        `;
+    });
+
+    function switchTab(tabId, evt) {
+        document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+        document.getElementById(tabId).style.display = 'block';
+        if (evt) evt.target.classList.add('active');
+
+        if (tabId === 'statement-tab') renderStatement();
+    }
+
+    function handleEmpChange() {
+        const emp = document.getElementById('empSelect').value;
+        document.getElementById('newStaffBox').style.display = (emp === 'NEW_STAFF') ? 'block' : 'none';
+        checkStatus();
+    }
+
+    function addNewStaffMember() {
+        const name = document.getElementById('newEmpName').value.trim();
+        const rate = parseFloat(document.getElementById('newEmpRate').value) || 15;
+        const pin = document.getElementById('newEmpPin').value.trim();
+
+        if (!name || !pin) {
+            alert('الرجاء إدخال اسم الموظف الجديد والرقم السري!');
+            return;
+        }
+
+        PINS[name] = pin;
+        RATES[name] = rate;
+        saveStaffMeta();
+        updateEmpDropdowns();
+
+        document.getElementById('empSelect').value = name;
+        document.getElementById('newStaffBox').style.display = 'none';
+        document.getElementById('newEmpName').value = '';
+        document.getElementById('newEmpPin').value = '';
+
+        alert(`✅ تم حفظ الموظف الجديد (${name}) بسعر ساعة ${rate} شيكل في السيستم!`);
+        checkStatus();
+    }
+
+    function deleteEmployee() {
+        const emp = document.getElementById('manageEmpSelect').value;
+        if (!emp || emp === 'admin') return;
+
+        if (confirm(`⚠ هل أنت متأكد من حذف الموظف (${emp}) نهائياً من السيستم؟`)) {
+            delete PINS[emp];
+            delete RATES[emp];
+            saveStaffMeta();
+            updateEmpDropdowns();
+            alert(`✅ تم حذف الموظف (${emp}) بنجاح.`);
+            renderDashboard();
+        }
+    }
+
+    function updateEmployeeRate() {
+        const emp = document.getElementById('manageEmpSelect').value;
+        const newRate = parseFloat(document.getElementById('updateRateValue').value);
+
+        if (!newRate || newRate <= 0) {
+            alert('أدخل سعر ساعة صحيح!');
+            return;
+        }
+
+        RATES[emp] = newRate;
+        saveStaffMeta();
+        alert(`✅ تم تعديل سعر الساعة للموظف (${emp}) إلى ${newRate} شيكل بنجاح!`);
+        renderDashboard();
+    }
+
+    function updateEmpDropdowns() {
+        const empSelect = document.getElementById('empSelect');
+        const filterEmp = document.getElementById('filterEmp');
+        const manageEmpSelect = document.getElementById('manageEmpSelect');
+        const stmtEmpSelect = document.getElementById('stmtEmpSelect');
+
+        const currentVal = empSelect.value;
+        empSelect.innerHTML = '';
+        filterEmp.innerHTML = '<option value="ALL_PHARMACY">🌐 صندوق الصيدلية العام (جميع الورديات)</option>';
+        if (manageEmpSelect) manageEmpSelect.innerHTML = '';
+        if (stmtEmpSelect) stmtEmpSelect.innerHTML = '';
+
+        Object.keys(PINS).forEach(emp => {
+            if (emp !== 'admin') {
+                empSelect.innerHTML += `<option value="${emp}">${emp}</option>`;
+                filterEmp.innerHTML += `<option value="${emp}">فولدر ${emp}</option>`;
+                if (manageEmpSelect) manageEmpSelect.innerHTML += `<option value="${emp}">${emp}</option>`;
+                if (stmtEmpSelect) stmtEmpSelect.innerHTML += `<option value="${emp}">${emp}</option>`;
+            }
+        });
+        empSelect.innerHTML += `<option value="NEW_STAFF">➕ إضافة موظف جديد...</option>`;
+        if (PINS[currentVal]) empSelect.value = currentVal;
+
+        const todayStr = new Date().toISOString().split('T')[0];
+        if (!document.getElementById('startDate').value) {
+            document.getElementById('startDate').value = todayStr;
+            document.getElementById('endDate').value = todayStr;
+            document.getElementById('stmtStartDate').value = todayStr;
+            document.getElementById('stmtEndDate').value = todayStr;
+        }
+    }
+
+    function getAllLogs(callback) {
+        if (db) {
+            db.ref('logs').once('value', snap => {
+                let all = [];
+                if (snap.exists()) {
+                    Object.values(snap.val()).forEach(empLogs => {
+                        all = all.concat(Object.values(empLogs));
+                    });
+                }
+                callback(all);
+            });
+        } else {
+            let all = [];
+            Object.keys(PINS).forEach(emp => {
+                const logs = JSON.parse(localStorage.getItem(`v7_${emp}_logs`) || '[]');
+                all = all.concat(logs);
+            });
+            callback(all);
+        }
+    }
+
+    function getLogs(emp, callback) {
+        if (emp === 'ALL_PHARMACY') {
+            getAllLogs(callback);
+            return;
+        }
+        if (db) {
+            db.ref(`logs/${emp}`).once('value', snap => {
+                callback(snap.val() ? Object.values(snap.val()) : []);
+            });
+        } else {
+            callback(JSON.parse(localStorage.getItem(`v7_${emp}_logs`) || '[]'));
+        }
+    }
+
+    function saveLogs(emp, data) {
+        localStorage.setItem(`v7_${emp}_logs`, JSON.stringify(data));
+        if (db) db.ref(`logs/${emp}`).set(data);
+    }
+
+    function getAllPayouts(callback) {
+        if (db) {
+            db.ref('payouts').once('value', snap => {
+                let all = [];
+                if (snap.exists()) {
+                    Object.values(snap.val()).forEach(empPayouts => {
+                        all = all.concat(Object.values(empPayouts));
+                    });
+                }
+                callback(all);
+            });
+        } else {
+            let all = [];
+            Object.keys(PINS).forEach(emp => {
+                const payouts = JSON.parse(localStorage.getItem(`v7_${emp}_payouts`) || '[]');
+                all = all.concat(payouts);
+            });
+            callback(all);
+        }
+    }
+
+    function getPayouts(emp, callback) {
+        if (emp === 'ALL_PHARMACY') {
+            getAllPayouts(callback);
+            return;
+        }
+        if (db) {
+            db.ref(`payouts/${emp}`).once('value', snap => {
+                callback(snap.val() ? Object.values(snap.val()) : []);
+            });
+        } else {
+            callback(JSON.parse(localStorage.getItem(`v7_${emp}_payouts`) || '[]'));
+        }
+    }
+
+    function savePayouts(emp, data) {
+        localStorage.setItem(`v7_${emp}_payouts`, JSON.stringify(data));
+        if (db) db.ref(`payouts/${emp}`).set(data);
+    }
+
+    function checkStatus() {
+        let emp = document.getElementById('empSelect').value;
+        if (!emp || emp === 'NEW_STAFF') return;
+
+        const shifts = JSON.parse(localStorage.getItem('v7_shifts') || '{}');
+        const badge = document.getElementById('statusBadge');
+        if (shifts[emp]) {
+            badge.style.display = 'block';
+            badge.innerText = `🟢 ${emp} داخل الوردية حالياً | بداية الكاش: ${shifts[emp].startCash} ₪ (${shifts[emp].inTime})`;
+            document.getElementById('btnIn').disabled = true;
+            document.getElementById('startCashBox').style.display = 'none';
+            document.getElementById('tasks-section').style.display = 'block';
+        } else {
+            badge.style.display = 'none';
+            document.getElementById('startCashBox').style.display = 'block';
+            document.getElementById('btnIn').disabled = false;
+            document.getElementById('tasks-section').style.display = 'none';
+        }
+    }
+
+    /* إرسال إشعار الواتساب حصرياً إلى د. أسيل (أم ورد) */
+    function sendWhatsAppToAseel(msgText) {
+        window.open(`https://wa.me/${PHONE_ASEEL_ADMIN}?text=${encodeURIComponent(msgText)}`, '_blank');
+    }
+
+    function clockIn() {
+        let empSelect = document.getElementById('empSelect');
+        let emp = empSelect.value;
+
+        if (emp === 'NEW_STAFF') {
+            alert('الرجاء الضغط على زر "حفظ الموظف الجديد" أولاً لقيده في النظام.');
+            return;
+        }
+
+        const pin = document.getElementById('empPin').value;
+        const startCash = parseFloat(document.getElementById('startCash').value) || 0;
+
+        if (pin !== PINS[emp]) {
+            alert('❌ الرقم السري غير صحيح!');
+            return;
+        }
+
+        const now = new Date();
+        const shifts = JSON.parse(localStorage.getItem('v7_shifts') || '{}');
+        shifts[emp] = {
+            timestamp: now.getTime(),
+            inTime: now.toLocaleTimeString('ar-EG'),
+            date: now.toISOString().split('T')[0],
+            startCash: startCash
+        };
+        localStorage.setItem('v7_shifts', JSON.stringify(shifts));
+        if (db) db.ref('shifts').set(shifts);
+
+        let clockInMsg = `🟢 *بدء وردية جديدة - صيدلية البلد بإدارة إياس ود. أسيل (أم ورد)*\n👤 *الموظف:* ${emp}\n🗓 *التاريخ:* ${shifts[emp].date}\n⏰ *وقت الدخول:* ${shifts[emp].inTime}\n💵 *بداية الكاش عند الاستلام:* ${startCash} ₪\n📋 *حالة المهام:* قيد التنفيذ (0 / 20)`;
+
+        sendWhatsAppToAseel(clockInMsg);
+
+        alert(`✅ تم تسجيل دخول ${emp} بنجاح | بداية الكاش: ${startCash} ₪ وتم إرسال الإشعار للدكتورة أسيل (أم ورد).`);
+        document.getElementById('empPin').value = '';
+        checkStatus();
+    }
+
+    function submitCheckOut() {
+        const emp = document.getElementById('empSelect').value;
+        const shifts = JSON.parse(localStorage.getItem('v7_shifts') || '{}');
+        const sData = shifts[emp];
+        if (!sData) {
+            alert('❌ لم يتم تسجيل الدخول بعد لهذه الوردية!');
+            return;
+        }
+
+        const endCash = parseFloat(document.getElementById('endCash').value);
+        if (isNaN(endCash)) {
+            alert('الرجاء إدخال مبلغ نهاية الكاش النقدي بالصندوق عند التسليم');
+            return;
+        }
+
+        const visaCash = parseFloat(document.getElementById('visaCash').value) || 0;
+        const expenditureCash = parseFloat(document.getElementById('expenditureCash').value) || 0;
+        const statusText = document.getElementById('cashMatchStatus').value || 'مطابق ✅';
+        const shiftNotes = document.getElementById('shiftNotes').value || 'لا يوجد ملاحظات';
+
+        const now = new Date();
+        const durationHrs = parseFloat(((now.getTime() - sData.timestamp) / (1000 * 60 * 60)).toFixed(2));
+        const rate = RATES[emp] || 15;
+        const amount = parseFloat((durationHrs * rate).toFixed(2));
+
+        const totalHandover = endCash + visaCash + expenditureCash;
+        const netSales = totalHandover - sData.startCash;
+
+        let taskDetailsList = [];
+        let completedList = [];
+        let uncompletedList = [];
+        let points = 0;
+
+        TASKS.forEach((t, i) => {
+            const singleLineTitle = formatSingleLineText(t);
+            const isChecked = document.getElementById(`task_${i}`).checked;
+            if (isChecked) {
+                points++;
+                completedList.push(`${i + 1}. ${singleLineTitle} ✅`);
+            } else {
+                uncompletedList.push(`${i + 1}. ${singleLineTitle} ❌ لم يتم`);
+            }
+            taskDetailsList.push(`${i + 1}. ${singleLineTitle} [${isChecked ? '✅ تم' : '❌ لم يتم'}]`);
+        });
+
+        const record = {
+            id: Date.now(),
+            date: sData.date,
+            emp: emp,
+            inTime: sData.inTime,
+            outTime: now.toLocaleTimeString('ar-EG'),
+            hours: durationHrs,
+            amount: amount,
+            startCash: sData.startCash,
+            endCash: endCash,
+            visaCash: visaCash,
+            expenditureCash: expenditureCash,
+            totalHandover: totalHandover,
+            netSales: netSales,
+            statusText: statusText,
+            tasksCount: points,
+            points: points,
+            details: taskDetailsList.join(' | '),
+            shiftNotes: shiftNotes,
+            taskEvals: [],
+            finalAverage: 0,
+            adminNote: ''
+        };
+
+        getLogs(emp, (logs) => {
+            logs.push(record);
+            saveLogs(emp, logs);
+
+            delete shifts[emp];
+            localStorage.setItem('v7_shifts', JSON.stringify(shifts));
+            if (db) db.ref('shifts').set(shifts);
+
+            if (GOOGLE_SHEET_URL && GOOGLE_SHEET_URL.includes("https")) {
+                fetch(GOOGLE_SHEET_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(record)
+                }).catch(e => console.log(e));
+            }
+
+            const doneText = completedList.length ? completedList.join('\n') : 'لا يوجد';
+            const undoneText = uncompletedList.length ? uncompletedList.join('\n') : 'تم إنجاز جميع المهام ✅';
+
+            const reportMsg = `📋 *تقرير تسليم الوردية والكاش - صيدلية البلد بإدارة إياس ود. أسيل (أم ورد)*\n👤 *الموظف:* ${emp}\n🗓 *التاريخ:* ${sData.date}\n⏰ *الدخول:* ${sData.inTime} | *الخروج:* ${record.outTime}\n💵 *بداية الكاش:* ${sData.startCash} ₪\n💵 *نهاية الكاش بالصندوق:* ${endCash} ₪\n💳 *مبيعات الفيزا:* ${visaCash} ₪\n🧾 *المصروفات:* ${expenditureCash} ₪\n💰 *إجمالي التسليم:* ${totalHandover} ₪\n📊 *المطابقة:* ${statusText}\n⏱ *المستحق:* ${amount} ₪\n\n✅ *المهام التي تم تنفيذها (${points} من 20):*\n${doneText}\n\n❌ *المهام التي لم تتم:*\n${undoneText}`;
+
+            sendWhatsAppToAseel(reportMsg);
+            alert(`✅ تم إنهاء الوردية وإرسال التقرير المفصل للدكتورة أسيل (أم ورد) بنجاح!`);
+            location.reload();
+        });
+    }
+
+    function verifyAdmin() {
+        if (document.getElementById('adminPin').value === '123459') {
+            document.getElementById('admin-login-box').style.display = 'none';
+            document.getElementById('admin-dashboard-content').style.display = 'block';
+            renderDashboard();
+        } else {
+            alert('❌ رمز الإدارة خاطئ!');
+        }
+    }
+
+    function closeAdmin() {
+        document.getElementById('admin-dashboard-content').style.display = 'none';
+        document.getElementById('admin-login-box').style.display = 'block';
+    }
+
+    function addPayout() {
+        let emp = document.getElementById('filterEmp').value;
+        if (emp === 'ALL_PHARMACY') emp = Object.keys(PINS).find(k => k !== 'admin') || 'ديما';
+
+        const amount = parseFloat(document.getElementById('payoutAmount').value);
+        const note = document.getElementById('payoutNote').value || 'سند صرف / سلفة';
+
+        if (!amount || amount <= 0) {
+            alert('أدخل مبلغ صحيح');
+            return;
+        }
+
+        const payout = { id: Date.now(), date: new Date().toISOString().split('T')[0], emp: emp, amount: amount, note: note };
+        getPayouts(emp, (payouts) => {
+            payouts.push(payout);
+            savePayouts(emp, payouts);
+
+            alert(`✅ تم حفظ وتثبيت السند لـ ${emp}`);
+            document.getElementById('payoutAmount').value = '';
+            document.getElementById('payoutNote').value = '';
+            renderDashboard();
+        });
+    }
+
+    /* حساب المتوسط الحسابي الفوري لتقييمات إياس ود. أسيل (غير المقيّم يُعتبر 0) */
+    function recalculateLiveAverage(recordId, totalCount) {
+        let sum = 0;
+        const count = totalCount || TASKS.length;
+        for (let i = 0; i < count; i++) {
+            const el = document.getElementById(`eval_score_${recordId}_${i}`);
+            const raw = el ? parseFloat(el.value) : 0;
+            const val = isNaN(raw) ? 0 : Math.max(0, Math.min(10, raw));
+            sum += val;
+        }
+        const avg = count > 0 ? parseFloat((sum / count).toFixed(2)) : 0;
+        const avgSpan = document.getElementById(`live_avg_${recordId}`);
+        if (avgSpan) avgSpan.innerText = `${avg} / 10`;
+        return avg;
+    }
+
+    /* حفظ تقييم إياس ود. أسيل لكل مهمة + حساب المتوسط التلقائي */
+    function saveAdminEvaluation(id, emp) {
+        getLogs(emp, (logs) => {
+            const idx = logs.findIndex(x => x.id === id);
+            if (idx === -1) return;
+
+            const currentRecord = logs[idx];
+            const itemsCount = currentRecord.details ? currentRecord.details.split(' | ').length : TASKS.length;
+            let evalList = [];
+            let sum = 0;
+
+            for (let i = 0; i < itemsCount; i++) {
+                const scoreEl = document.getElementById(`eval_score_${id}_${i}`);
+                const noteEl = document.getElementById(`eval_note_${id}_${i}`);
+                const rawScore = scoreEl ? parseFloat(scoreEl.value) : 0;
+                const scoreVal = isNaN(rawScore) ? 0 : Math.max(0, Math.min(10, rawScore));
+                const noteVal = noteEl ? noteEl.value.trim() : '';
+
+                sum += scoreVal;
+                evalList.push({ index: i, score: scoreVal, note: noteVal });
+            }
+
+            const finalAvg = itemsCount > 0 ? parseFloat((sum / itemsCount).toFixed(2)) : 0;
+            const finalNoteEl = document.getElementById(`final_note_${id}`);
+            const finalNoteVal = finalNoteEl ? finalNoteEl.value.trim() : '';
+
+            logs[idx].taskEvals = evalList;
+            logs[idx].finalAverage = finalAvg;
+            logs[idx].adminNote = finalNoteVal;
+
+            saveLogs(emp, logs);
+            alert(`✅ تم حفظ التقييم! المتوسط الحسابي (نهائي التقييم): ${finalAvg} / 10`);
+            renderDashboard();
+        });
+    }
+
+    function sendPdfReport(id, emp) {
+        printLogRecord(id, emp);
+    }
+
+    function renderDashboard() {
+        const emp = document.getElementById('filterEmp').value;
+        const sDate = document.getElementById('startDate').value;
+        const eDate = document.getElementById('endDate').value;
+
+        if (!emp) return;
+
+        getLogs(emp, (allLogs) => {
+            getPayouts(emp, (allPayouts) => {
+                const filteredLogs = allLogs.filter(l => (!sDate || l.date >= sDate) && (!eDate || l.date <= eDate));
+                const filteredPayouts = allPayouts.filter(p => (!sDate || p.date >= sDate) && (!eDate || p.date <= eDate));
+
+                const totalEarned = filteredLogs.reduce((s, l) => s + (parseFloat(l.amount) || 0), 0);
+                const totalPaid = filteredPayouts.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+                const totalSales = filteredLogs.reduce((s, l) => s + (parseFloat(l.netSales) || 0), 0);
+                const totalVisa = filteredLogs.reduce((s, l) => s + (parseFloat(l.visaCash) || 0), 0);
+                const totalExpenses = filteredLogs.reduce((s, l) => s + (parseFloat(l.expenditureCash) || 0), 0);
+                const totalPoints = filteredLogs.reduce((s, l) => s + (parseFloat(l.points || l.tasksCount) || 0), 0);
+
+                const remainingSalary = totalEarned - totalPaid;
+                const netPharmacyCash = totalSales - totalVisa - totalExpenses;
+                const empTitle = emp === 'ALL_PHARMACY' ? '🌐 صندوق الصيدلية العام (جميع الورديات)' : `فولدر (${emp})`;
+
+                document.getElementById('summaryBox').innerHTML = `
+                    <div style="font-size:16px;">📁 <b>التقرير النشط:</b> <span style="color:var(--secondary); font-weight:bold;">${empTitle}</span></div>
+                    <div>🗓 <b>الفترة المحددة:</b> ${sDate || 'الكل'} إلى ${eDate || 'الكل'}</div>
+                    <hr style="border:none; border-top:1px solid #bbf7d0; margin:8px 0;">
+                    <div>🏆 <b>مجموع المهام المنجزة:</b> <span class="points-badge">${totalPoints} مهمة</span></div>
+                    <div>📈 <b>إجمالي المبيعات الكلية:</b> <span style="font-weight:bold; color:purple;">${totalSales.toFixed(2)} ₪</span></div>
+                    <div>💳 <b>إجمالي مبيعات الفيزا:</b> <span style="font-weight:bold; color:#0284c7;">${totalVisa.toFixed(2)} ₪</span></div>
+                    <div>🧾 <b>إجمالي المصروفات:</b> <span style="font-weight:bold; color:#d97706;">${totalExpenses.toFixed(2)} ₪</span></div>
+                    <div>⏱ <b>إجمالي مستحق الراتب/الأجر:</b> <span style="font-weight:bold; color:blue;">${totalEarned.toFixed(2)} ₪</span></div>
+                    <div>💵 <b>إجمالي المسحوبات والسُلف:</b> <span style="font-weight:bold; color:green;">${totalPaid.toFixed(2)} ₪</span></div>
+                    <div style="font-size:16px; margin-top:6px; font-weight:bold;">⚖️ <b>الرصيد المتبقي للراتب:</b> <span style="color:${remainingSalary >= 0 ? 'green' : 'red'};">${remainingSalary.toFixed(2)} ₪</span></div>
+                    <div style="font-size:16px; margin-top:4px; font-weight:bold; color:green;">📊 <b>صافي الكاش النقدي بالصندوق:</b> <span>${netPharmacyCash.toFixed(2)} ₪</span></div>
+                `;
+
+                const lBody = document.querySelector('#logsTable tbody');
+                lBody.innerHTML = '';
+                filteredLogs.forEach(l => {
+                    const pts = l.points || l.tasksCount || 0;
+                    const totalDelivery = (parseFloat(l.endCash) || 0) + (parseFloat(l.visaCash) || 0) + (parseFloat(l.expenditureCash) || 0);
+                    const matchBadge = (l.statusText && l.statusText.includes('غير'))
+                        ? `<span class="status-badge-mismatch">${l.statusText}</span>`
+                        : `<span class="status-badge-match">${l.statusText || 'مطابق ✅'}</span>`;
+
+                    const items = l.details ? l.details.split(' | ') : [];
+                    const existingEvals = Array.isArray(l.taskEvals) ? l.taskEvals : [];
+
+                    let tasksRowsHtml = '';
+                    let evalInputsHtml = '';
+
+                    if (items.length > 0) {
+                        items.forEach((item, idx) => {
+                            const isDone = item.includes('✅');
+                            const cleanName = item.replace('[✅ تم]', '').replace('[❌ لم يتم]', '').replace('[✅]', '').replace('[❌]', '').trim();
+                            const matchObj = existingEvals.find(ev => ev.index === idx) || { score: 0, note: '' };
+                            const safeTaskNote = String(matchObj.note || '').replace(/"/g, '&quot;');
+                            const taskTwoLines = formatTaskLinesHtml(cleanName, idx);
+
+                            tasksRowsHtml += `<tr>
+                                <td style="width:32px; text-align:center; font-weight:bold;">${idx + 1}</td>
+                                <td>${taskTwoLines}</td>
+                                <td class="st-cell" style="color:${isDone ? '#15803d' : '#dc2626'};">${isDone ? 'تم' : 'لم يتم'}</td>
+                            </tr>`;
+
+                            evalInputsHtml += `
+                                <div class="per-task-eval-row">
+                                    <span style="font-weight:bold; min-width:24px;">#${idx + 1}</span>
+                                    <input type="number" min="0" max="10" step="0.5" id="eval_score_${l.id}_${idx}" class="per-task-score" value="${matchObj.score}" oninput="recalculateLiveAverage(${l.id}, ${items.length})" title="تقييم إياس وأسيل من 10">
+                                    <input type="text" id="eval_note_${l.id}_${idx}" class="per-task-note" value="${safeTaskNote}" placeholder="ملاحظة النقطة...">
+                                </div>
+                            `;
+                        });
+                    } else {
+                        tasksRowsHtml = '<tr><td colspan="2">لا توجد تفاصيل مهام</td></tr>';
+                    }
+
+                    const computedAvg = typeof l.finalAverage === 'number' ? l.finalAverage : 0;
+                    const safeFinalNote = String(l.adminNote || '').replace(/"/g, '&quot;');
+
+                    lBody.innerHTML += `<tr>
+                        <td>${l.date}</td>
+                        <td><b>${l.emp}</b></td>
+                        <td>${l.inTime}<br>${l.outTime}</td>
+                        <td style="color:blue;">${l.startCash || 0} ₪</td>
+                        <td>💵 كاش: ${l.endCash || 0} ₪<br><small style="color:#0284c7;">💳 فيزا: ${l.visaCash || 0} ₪</small><br><small style="color:#d97706;">🧾 مصروفات: ${l.expenditureCash || 0} ₪</small></td>
+                        <td style="font-weight:bold; color:purple;">${totalDelivery} ₪</td>
+                        <td>${matchBadge}</td>
+                        <td><b>${l.amount} ₪</b></td>
+                        <td><span class="points-badge">${pts} / 20</span></td>
+                        <td>
+                            <div class="admin-split-wrap">
+                                <div class="admin-tasks-right">
+                                    <table>
+                                        <tbody>${tasksRowsHtml}</tbody>
+                                    </table>
+                                    ${l.shiftNotes ? `<div style="padding:5px 6px; font-size:11px; color:#334155;"><b>بيان:</b> ${l.shiftNotes}</div>` : ''}
+                                </div>
+                                <div class="admin-eval-left">
+                                    <div class="admin-eval-title">تقييم إياس ود. أسيل (من 10)</div>
+                                    <div class="per-task-eval-list">${evalInputsHtml}</div>
+                                    <div class="final-avg-box">
+                                        نهائي التقييم (المتوسط): <span id="live_avg_${l.id}">${computedAvg} / 10</span>
+                                    </div>
+                                    <input type="text" id="final_note_${l.id}" class="mini-note-input" value="${safeFinalNote}" placeholder="ملاحظة نهائية للإدارة...">
+                                    <button class="btn btn-success" style="width:100%; padding:5px; font-size:11px;" onclick="saveAdminEvaluation(${l.id}, '${l.emp}')">💾 حفظ التقييم</button>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <button class="btn btn-warning" style="width:100%; padding:4px 6px; font-size:11px; margin-bottom:3px;" onclick="editLog(${l.id}, '${l.emp}')">✏ تعديل</button>
+                            <button class="btn btn-primary" style="width:100%; padding:4px 6px; font-size:11px; margin-bottom:3px;" onclick="printLogRecord(${l.id}, '${l.emp}')">🖨 طباعة</button>
+                            <button class="btn btn-dark" style="width:100%; padding:4px 6px; font-size:11px; margin-bottom:3px;" onclick="sendPdfReport(${l.id}, '${l.emp}')">📄 إرسال PDF</button>
+                            <button class="btn btn-danger" style="width:100%; padding:4px 6px; font-size:11px;" onclick="deleteLog(${l.id}, '${l.emp}')">❌ حذف</button>
+                        </td>
+                    </tr>`;
+                });
+
+                const pBody = document.querySelector('#payoutsTable tbody');
+                pBody.innerHTML = '';
+                filteredPayouts.forEach(p => {
+                    pBody.innerHTML += `<tr>
+                        <td>${p.date}</td>
+                        <td><b>${p.emp}</b></td>
+                        <td style="color:green; font-weight:bold;">${p.amount} ₪</td>
+                        <td>${p.note}</td>
+                        <td>
+                            <button class="btn btn-warning" style="padding:3px 6px; font-size:11px;" onclick="editPayout(${p.id}, '${p.emp}')">✏ تعديل</button>
+                            <button class="btn btn-primary" style="padding:3px 6px; font-size:11px;" onclick="printReceipt(${p.id}, '${p.emp}')">🖨 طباعة</button>
+                            <button class="btn btn-danger" style="padding:3px 6px; font-size:11px;" onclick="deletePayout(${p.id}, '${p.emp}')">❌ حذف</button>
+                        </td>
+                    </tr>`;
+                });
+            });
+        });
+    }
+
+    function renderStatement() {
+        const emp = document.getElementById('stmtEmpSelect').value;
+        const sDate = document.getElementById('stmtStartDate').value;
+        const eDate = document.getElementById('stmtEndDate').value;
+
+        if (!emp) return;
+
+        getLogs(emp, (allLogs) => {
+            getPayouts(emp, (allPayouts) => {
+                const filteredLogs = allLogs.filter(l => (!sDate || l.date >= sDate) && (!eDate || l.date <= eDate));
+                const filteredPayouts = allPayouts.filter(p => (!sDate || p.date >= sDate) && (!eDate || p.date <= eDate));
+
+                const totalEarned = filteredLogs.reduce((s, l) => s + (parseFloat(l.amount) || 0), 0);
+                const totalPaid = filteredPayouts.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+                const totalSales = filteredLogs.reduce((s, l) => s + (parseFloat(l.netSales) || 0), 0);
+                const totalPoints = filteredLogs.reduce((s, l) => s + (parseFloat(l.points || l.tasksCount) || 0), 0);
+                const remaining = totalEarned - totalPaid;
+
+                document.getElementById('stmtSummaryBox').innerHTML = `
+                    <div style="font-size:16px;">📂 <b>كشف حساب الموظف:</b> <span style="color:var(--secondary); font-weight:bold;">${emp}</span></div>
+                    <div>🗓 <b>الفترة المحددة:</b> ${sDate || 'الكل'} إلى ${eDate || 'الكل'}</div>
+                    <hr style="border:none; border-top:1px solid #bbf7d0; margin:8px 0;">
+                    <div>🏆 <b>مجموع المهام المنجزة:</b> <span class="points-badge">${totalPoints} مهمة</span></div>
+                    <div>📈 <b>إجمالي مبيعات الوردية:</b> <span style="font-weight:bold; color:purple;">${totalSales.toFixed(2)} ₪</span></div>
+                    <div>⏱ <b>إجمالي مستحق الدوام:</b> <span style="font-weight:bold; color:blue;">${totalEarned.toFixed(2)} ₪</span></div>
+                    <div>💵 <b>إجمالي المسحوبات والسُلف:</b> <span style="font-weight:bold; color:green;">${totalPaid.toFixed(2)} ₪</span></div>
+                    <div style="font-size:16px; margin-top:6px; font-weight:bold;">⚖️ <b>الرصيد المتبقي للحساب:</b> <span style="color:${remaining >= 0 ? 'green' : 'red'};">${remaining.toFixed(2)} ₪</span></div>
+                `;
+
+                const lBody = document.querySelector('#stmtLogsTable tbody');
+                lBody.innerHTML = '';
+                filteredLogs.forEach(l => {
+                    const pts = l.points || l.tasksCount || 0;
+                    const tasksFormatted = l.details ? l.details.split(' | ').map(t => `<div>${t}</div>`).join('') : 'لا تفاصيل';
+                    const totalDelivery = (parseFloat(l.endCash) || 0) + (parseFloat(l.visaCash) || 0) + (parseFloat(l.expenditureCash) || 0);
+                    const hasAvg = typeof l.finalAverage === 'number' && (l.finalAverage > 0 || (Array.isArray(l.taskEvals) && l.taskEvals.length > 0));
+                    const evalText = (hasAvg || l.adminNote)
+                        ? `<div style="margin-top:5px; padding:5px; background:#fffbeb; border:1px solid #fde68a; border-radius:4px; color:#92400e;"><b>تقييم إياس ود. أسيل (المتوسط):</b> ${hasAvg ? l.finalAverage + ' / 10' : ''} ${l.adminNote ? ' | <b>ملاحظة:</b> ' + l.adminNote : ''}</div>`
+                        : '';
+
+                    lBody.innerHTML += `<tr>
+                        <td>${l.date}</td>
+                        <td>${l.inTime}<br>${l.outTime}</td>
+                        <td style="color:blue;">${l.startCash || 0} ₪</td>
+                        <td>💵 كاش: ${l.endCash || 0} ₪<br><small style="color:#0284c7;">💳 فيزا: ${l.visaCash || 0} ₪</small><br><small style="color:#d97706;">🧾 مصروفات: ${l.expenditureCash || 0} ₪</small></td>
+                        <td style="font-weight:bold; color:purple;">${totalDelivery} ₪</td>
+                        <td>${l.statusText || 'مطابق ✅'}</td>
+                        <td><b>${l.amount} ₪</b></td>
+                        <td style="text-align:right;">
+                            <span class="points-badge">${pts} / 20</span>
+                            <div style="margin-top:4px; font-size:12px;">${tasksFormatted}</div>
+                            ${evalText}
+                        </td>
+                    </tr>`;
+                });
+
+                const pBody = document.querySelector('#stmtPayoutsTable tbody');
+                pBody.innerHTML = '';
+                filteredPayouts.forEach(p => {
+                    pBody.innerHTML += `<tr>
+                        <td>${p.date}</td>
+                        <td style="color:green; font-weight:bold;">${p.amount} ₪</td>
+                        <td>${p.note}</td>
+                    </tr>`;
+                });
+            });
+        });
+    }
+
+    function editLog(id, emp) {
+        getLogs(emp, (logs) => {
+            const idx = logs.findIndex(x => x.id === id);
+            if (idx === -1) return;
+            const l = logs[idx];
+
+            const newStart = prompt("بداية الكاش:", l.startCash || 0);
+            if (newStart === null) return;
+            const newEnd = prompt("نهاية الكاش النقدي بالصندوق:", l.endCash || 0);
+            if (newEnd === null) return;
+            const newVisa = prompt("مبيعات الفيزا:", l.visaCash || 0);
+            if (newVisa === null) return;
+            const newExp = prompt("المصروفات والنثريات:", l.expenditureCash || 0);
+            if (newExp === null) return;
+            const newStatus = prompt("مطابقة الكاش (اكتب: مطابق ✅ أو غير مطابق ❌):", l.statusText || 'مطابق ✅');
+            if (newStatus === null) return;
+            const newNotes = prompt("بيان المصروفات والملاحظات:", l.shiftNotes || '');
+            if (newNotes === null) return;
+            const newAmt = prompt("المستحق (شيكل):", l.amount);
+            if (newAmt === null) return;
+
+            l.startCash = parseFloat(newStart) || 0;
+            l.endCash = parseFloat(newEnd) || 0;
+            l.visaCash = parseFloat(newVisa) || 0;
+            l.expenditureCash = parseFloat(newExp) || 0;
+            l.statusText = newStatus;
+            l.shiftNotes = newNotes;
+            l.totalHandover = l.endCash + l.visaCash + l.expenditureCash;
+            l.netSales = l.totalHandover - l.startCash;
+            l.amount = parseFloat(newAmt) || 0;
+
+            logs[idx] = l;
+            saveLogs(emp, logs);
+            alert("✅ تم تعديل سجل الدوام والمالية بنجاح!");
+            renderDashboard();
+        });
+    }
+
+    function deleteLog(id, emp) {
+        if (confirm("هل أنت متأكد من حذف هذا السجل نهائياً؟")) {
+            getLogs(emp, (logs) => {
+                const newLogs = logs.filter(x => x.id !== id);
+                saveLogs(emp, newLogs);
+                alert("✅ تم حذف سجل الوردية بنجاح.");
+                renderDashboard();
+            });
+        }
+    }
+
+    function editPayout(id, emp) {
+        getPayouts(emp, (payouts) => {
+            const idx = payouts.findIndex(x => x.id === id);
+            if (idx === -1) return;
+            const p = payouts[idx];
+
+            const newAmt = prompt("أدخل المبلغ الجديد:", p.amount);
+            if (newAmt === null) return;
+            const newNote = prompt("أدخل البيان الجديد:", p.note);
+            if (newNote === null) return;
+
+            p.amount = parseFloat(newAmt) || 0;
+            p.note = newNote;
+            payouts[idx] = p;
+
+            savePayouts(emp, payouts);
+            alert("✅ تم تعديل سند الصرف بنجاح!");
+            renderDashboard();
+        });
+    }
+
+    function deletePayout(id, emp) {
+        if (confirm("هل أنت متأكد من حذف سند الصرف هذا؟")) {
+            getPayouts(emp, (payouts) => {
+                const newPayouts = payouts.filter(x => x.id !== id);
+                savePayouts(emp, newPayouts);
+                alert("✅ تم حذف السند بنجاح.");
+                renderDashboard();
+            });
+        }
+    }
+
+    /* طباعة / حفظ PDF مقاس 80x80mm شامل جدول المهام وتقييم إياس ود. أسيل والمتوسط الحسابي */
+    function printLogRecord(id, emp) {
+        getLogs(emp, (logs) => {
+            const data = logs.find(x => x.id === id);
+            if (!data) return;
+            const receipt = document.getElementById('printable-receipt');
+
+            const items = data.details ? data.details.split(' | ') : [];
+            const evals = Array.isArray(data.taskEvals) ? data.taskEvals : [];
+
+            let taskItems = '';
+            if (items.length > 0) {
+                taskItems = `
+                    <thead>
+                        <tr>
+                            <th style="width:42%;">المهمة</th>
+                            <th style="width:16%;">الحالة</th>
+                            <th style="width:42%;">التقييم والملاحظة</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                ` + items.map((t, idx) => {
+                    const isDone = t.includes('✅');
+                    const cleanT = t.replace('[✅ تم]', '').replace('[❌ لم يتم]', '').replace('[✅]', '').replace('[❌]', '').trim();
+                    const evObj = evals.find(e => e.index === idx) || { score: 0, note: '' };
+                    const scorePart = `<b>${evObj.score}/10</b>`;
+                    const notePart = evObj.note ? `<br><span style="font-size:9.5px;">${evObj.note}</span>` : '';
+                    return `<tr>
+                        <td style="width:42%; text-align:right;">${idx + 1}. ${formatTaskLinesHtml(cleanT, idx)}</td>
+                        <td style="width:16%; text-align:center;">${isDone ? 'تم' : 'لم يتم'}</td>
+                        <td style="width:42%; text-align:center;">${scorePart}${notePart}</td>
+                    </tr>`;
+                }).join('') + `</tbody>`;
+            } else {
+                taskItems = '<tbody><tr><td colspan="3" style="text-align:center;">لا توجد تفاصيل مهام</td></tr></tbody>';
+            }
+
+            const totalDelivery = (parseFloat(data.endCash) || 0) + (parseFloat(data.visaCash) || 0) + (parseFloat(data.expenditureCash) || 0);
+            const avgDisplay = typeof data.finalAverage === 'number' ? `${data.finalAverage} / 10` : '0 / 10';
+            const noteDisplay = data.adminNote || '---';
+
+            receipt.innerHTML = `
+                <div style="width:100%; text-align:center;">
+                    <h2 style="margin:0; font-size:15px; font-weight:bold;">صيدلية البلد</h2>
+                    <p style="margin:2px 0; font-size:11px; font-weight:bold;">بإدارة إياس ود. أسيل (أم ورد)</p>
+                    <hr>
+                    <table>
+                        <tr><td style="width:45%;"><b>التاريخ:</b></td><td>${data.date}</td></tr>
+                        <tr><td><b>الموظف:</b></td><td>${data.emp}</td></tr>
+                        <tr><td><b>الدخول / الخروج:</b></td><td>${data.inTime} - ${data.outTime}</td></tr>
+                        <tr><td><b>بداية الكاش:</b></td><td>${data.startCash} ₪</td></tr>
+                        <tr><td><b>نهاية الكاش:</b></td><td>${data.endCash} ₪</td></tr>
+                        <tr><td><b>الفيزا:</b></td><td>${data.visaCash || 0} ₪</td></tr>
+                        <tr><td><b>المصروفات:</b></td><td>${data.expenditureCash || 0} ₪</td></tr>
+                        <tr><td><b>إجمالي التسليم:</b></td><td><b>${totalDelivery} ₪</b></td></tr>
+                        <tr><td><b>المطابقة:</b></td><td>${data.statusText || 'مطابق'}</td></tr>
+                        <tr><td><b>المستحق:</b></td><td>${data.amount} ₪</td></tr>
+                        <tr><td><b>المنجز:</b></td><td>${data.points || data.tasksCount || 0} / 20</td></tr>
+                    </table>
+                    <hr>
+                    <table>
+                        <tr><th style="width:52%;">نهائي التقييم (المتوسط)</th><td><b>${avgDisplay}</b></td></tr>
+                        <tr><th>ملاحظات الإدارة</th><td>${noteDisplay}</td></tr>
+                    </table>
+                    <hr>
+                    <p style="margin:2px 0; text-align:right; font-size:11px; font-weight:bold;">جدول المهام والتقييم:</p>
+                    <table>${taskItems}</table>
+                    <hr>
+                    <p style="font-size:10px; margin:2px 0;">${new Date().toLocaleString('ar-EG')}</p>
+                </div>
+            `;
+            window.print();
+        });
+    }
+
+    function printReceipt(id, emp) {
+        getPayouts(emp, (payouts) => {
+            const p = payouts.find(x => x.id === id);
+            if (!p) return;
+            const receipt = document.getElementById('printable-receipt');
+            receipt.innerHTML = `
+                <div style="width:100%; text-align:center;">
+                    <h2 style="margin:0; font-size:15px; font-weight:bold;">صيدلية البلد</h2>
+                    <p style="margin:2px 0; font-size:11px; font-weight:bold;">بإدارة إياس ود. أسيل (أم ورد)</p>
+                    <p style="margin:2px 0; font-size:10.5px;">سند صرف مالي / سلفة</p>
+                    <hr>
+                    <table>
+                        <tr><td style="width:40%;"><b>التاريخ:</b></td><td>${p.date}</td></tr>
+                        <tr><td><b>الموظف:</b></td><td>${p.emp}</td></tr>
+                        <tr><td><b>المبلغ:</b></td><td>${p.amount} ₪</td></tr>
+                        <tr><td><b>البيان:</b></td><td>${p.note}</td></tr>
+                    </table>
+                    <hr>
+                    <p style="font-size:10px; margin:2px 0;">${new Date().toLocaleString('ar-EG')}</p>
+                </div>
+            `;
+            window.print();
+        });
+    }
+
+    updateEmpDropdowns();
+    syncFromCloud();
+    checkStatus();
+</script>
+</body>
+</html>
