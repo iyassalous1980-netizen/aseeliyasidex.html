@@ -278,23 +278,22 @@
             margin-bottom: 6px;
         }
 
-        /* طباعة حرارية بخط أسود داكن جداً (900) وحدود كاملة لا تقتطع العمود الأخير */
         #printable-receipt { display: none; }
         @media print {
             @page {
-                size: auto;
-                margin: 2mm;
+                margin: 4mm;
             }
             html, body {
                 width: 100% !important;
-                max-width: 100% !important;
                 margin: 0 !important;
                 padding: 0 !important;
                 background: #fff !important;
                 color: #000 !important;
-                overflow: visible !important;
+                direction: rtl !important;
             }
-            body * { visibility: hidden; }
+            body * {
+                visibility: hidden !important;
+            }
             #printable-receipt, #printable-receipt * {
                 visibility: visible !important;
                 color: #000 !important;
@@ -305,44 +304,46 @@
                 display: block !important;
                 position: static !important;
                 width: 100% !important;
-                max-width: 78mm !important;
-                margin: 0 auto !important;
-                padding: 3mm 1.5mm !important;
-                color: #000 !important;
+                max-width: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
                 background: #fff !important;
+                color: #000 !important;
                 font-size: 12px !important;
-                font-weight: 900 !important;
+                line-height: 1.5 !important;
                 direction: rtl !important;
-                text-align: center !important;
+                text-align: right !important;
             }
             #printable-receipt table {
                 width: 100% !important;
                 max-width: 100% !important;
-                table-layout: fixed !important;
                 border-collapse: collapse !important;
-                margin-top: 7px !important;
-                margin-bottom: 7px !important;
+                margin: 6px 0 !important;
                 border: 1.5px solid #000 !important;
             }
             #printable-receipt th, #printable-receipt td {
                 border: 1.5px solid #000 !important;
-                padding: 5px 4px !important;
+                padding: 5px 6px !important;
                 text-align: right !important;
-                font-size: 10.5px !important;
+                font-size: 11px !important;
                 font-weight: 900 !important;
                 color: #000 !important;
-                line-height: 1.48 !important;
+                line-height: 1.45 !important;
                 vertical-align: middle !important;
-                overflow-wrap: normal !important;
                 word-break: normal !important;
+                overflow-wrap: break-word !important;
             }
             #printable-receipt th {
                 background: #e5e7eb !important;
                 text-align: center !important;
-                font-size: 9.5px !important;
+                font-size: 11px !important;
                 font-weight: 900 !important;
             }
-            #printable-receipt hr { border: none; border-top: 1.5px dashed #000; margin: 4px 0; }
+            #printable-receipt hr {
+                border: none !important;
+                border-top: 1.5px dashed #000 !important;
+                margin: 6px 0 !important;
+            }
         }
     </style>
 </head>
@@ -1500,7 +1501,7 @@
         }
     }
 
-    /* طباعة / حفظ PDF مقاس 80x80mm شامل جدول المهام وتقييم إياس ود. أسيل والمتوسط الحسابي */
+    /* طباعة / حفظ PDF شامل جدول المهام وتقييم إياس ود. أسيل والمتوسط الحسابي */
     function printLogRecord(id, emp) {
         getLogs(emp, (logs) => {
             const data = logs.find(x => x.id === id);
@@ -1515,9 +1516,9 @@
                 taskItems = `
                     <thead>
                         <tr>
-                            <th style="width:52%;">المهمة</th>
-                            <th style="width:18%;">الحالة</th>
-                            <th style="width:30%;">التقييم</th>
+                            <th style="width:50%;">المهمة</th>
+                            <th style="width:16%;">الحالة</th>
+                            <th style="width:34%;">التقييم والملاحظة</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1526,11 +1527,11 @@
                     const cleanT = t.replace('[✅ تم]', '').replace('[❌ لم يتم]', '').replace('[✅]', '').replace('[❌]', '').trim();
                     const evObj = evals.find(e => e.index === idx) || { score: 0, note: '' };
                     const scorePart = `<div><b>${evObj.score}/10</b></div>`;
-                    const notePart = evObj.note ? `<div style="font-size:9.5px; margin-top:2px;">${evObj.note}</div>` : '';
+                    const notePart = evObj.note ? `<div style="font-size:10px; margin-top:2px;">${evObj.note}</div>` : '';
                     return `<tr>
-                        <td style="width:52%; text-align:right;">${idx + 1}. ${formatSingleLineText(cleanT)}</td>
-                        <td style="width:18%; text-align:center; white-space:nowrap;">${isDone ? 'تم ✅' : 'لم يتم ❌'}</td>
-                        <td style="width:30%; text-align:center;">${scorePart}${notePart}</td>
+                        <td style="text-align:right;">${idx + 1}. ${formatSingleLineText(cleanT)}</td>
+                        <td style="text-align:center; white-space:nowrap;">${isDone ? 'تم ✅' : 'لم يتم ❌'}</td>
+                        <td style="text-align:center;">${scorePart}${notePart}</td>
                     </tr>`;
                 }).join('') + `</tbody>`;
             } else {
