@@ -305,12 +305,12 @@
                 display: block !important;
                 position: static !important;
                 width: 100% !important;
-                max-width: 74mm !important;
+                max-width: 76mm !important;
                 margin: 0 auto !important;
-                padding: 2mm 1mm !important;
+                padding: 3mm 2mm !important;
                 color: #000 !important;
                 background: #fff !important;
-                font-size: 11px !important;
+                font-size: 11.5px !important;
                 font-weight: 900 !important;
                 direction: rtl !important;
                 text-align: center !important;
@@ -320,20 +320,21 @@
                 max-width: 100% !important;
                 table-layout: fixed !important;
                 border-collapse: collapse !important;
-                margin-top: 4px !important;
+                margin-top: 6px !important;
+                margin-bottom: 6px !important;
                 border: 1.5px solid #000 !important;
             }
             #printable-receipt th, #printable-receipt td {
                 border: 1.5px solid #000 !important;
-                padding: 2.5px 2px !important;
+                padding: 4px 3.5px !important;
                 text-align: right !important;
-                font-size: 9.5px !important;
+                font-size: 10px !important;
                 font-weight: 900 !important;
                 color: #000 !important;
-                line-height: 1.3 !important;
+                line-height: 1.42 !important;
                 vertical-align: middle !important;
-                overflow-wrap: anywhere !important;
-                word-break: break-word !important;
+                overflow-wrap: break-word !important;
+                word-break: normal !important;
             }
             #printable-receipt th {
                 background: #e5e7eb !important;
@@ -1263,7 +1264,7 @@
                     const safeFinalNote = String(l.adminNote || '').replace(/"/g, '&quot;');
 
                     lBody.innerHTML += `<tr>
-                        <td>${l.date}</td>
+                        <td>${l.dayName ? `<div><b>${l.dayName}</b></div>` : ''}${l.date}</td>
                         <td><b>${l.emp}</b></td>
                         <td>${l.inTime}<br>${l.outTime}</td>
                         <td style="color:blue;">${l.startCash || 0} ₪</td>
@@ -1360,7 +1361,7 @@
                         : '';
 
                     lBody.innerHTML += `<tr>
-                        <td>${l.date}</td>
+                        <td>${l.dayName ? `<div><b>${l.dayName}</b></div>` : ''}${l.date}</td>
                         <td>${l.inTime}<br>${l.outTime}</td>
                         <td style="color:blue;">${l.startCash || 0} ₪</td>
                         <td>💵 كاش: ${l.endCash || 0} ₪<br><small style="color:#0284c7;">💳 فيزا: ${l.visaCash || 0} ₪</small><br><small style="color:#d97706;">🧾 مصروفات: ${l.expenditureCash || 0} ₪</small></td>
@@ -1388,27 +1389,57 @@
         });
     }
 
+    function getArabicDayNameFromDate(dateStr) {
+        if (!dateStr) return '';
+        const d = new Date(dateStr + 'T12:00:00');
+        if (isNaN(d.getTime())) return '';
+        return d.toLocaleDateString('ar-EG', { weekday: 'long' });
+    }
+
     function editLog(id, emp) {
         getLogs(emp, (logs) => {
             const idx = logs.findIndex(x => x.id === id);
             if (idx === -1) return;
             const l = logs[idx];
 
-            const newStart = prompt("بداية الكاش:", l.startCash || 0);
+            const currentDay = l.dayName || getArabicDayNameFromDate(l.date) || '';
+            const newDay = prompt("1/7 اليوم (مثال: السبت / الأحد):", currentDay);
+            if (newDay === null) return;
+
+            const newDate = prompt("2/7 التاريخ (YYYY-MM-DD):", l.date || '');
+            if (newDate === null) return;
+
+            const newInTime = prompt("3أ/7 ساعة الدخول:", l.inTime || '');
+            if (newInTime === null) return;
+
+            const newOutTime = prompt("3ب/7 ساعة الخروج:", l.outTime || '');
+            if (newOutTime === null) return;
+
+            const newStart = prompt("4/7 بداية الشفت (بداية الكاش):", l.startCash || 0);
             if (newStart === null) return;
-            const newEnd = prompt("نهاية الكاش النقدي بالصندوق:", l.endCash || 0);
+
+            const newEnd = prompt("5/7 نهاية الشفت (الكاش النقدي بالصندوق):", l.endCash || 0);
             if (newEnd === null) return;
+
             const newVisa = prompt("مبيعات الفيزا:", l.visaCash || 0);
             if (newVisa === null) return;
-            const newExp = prompt("المصروفات والنثريات:", l.expenditureCash || 0);
+
+            const newExp = prompt("6/7 الخصومات / المصروفات:", l.expenditureCash || 0);
             if (newExp === null) return;
+
             const newStatus = prompt("مطابقة الكاش (اكتب: مطابق ✅ أو غير مطابق ❌):", l.statusText || 'مطابق ✅');
             if (newStatus === null) return;
-            const newNotes = prompt("بيان المصروفات والملاحظات:", l.shiftNotes || '');
+
+            const newNotes = prompt("7/7 الملاحظات:", l.shiftNotes || '');
             if (newNotes === null) return;
+
             const newAmt = prompt("المستحق (شيكل):", l.amount);
             if (newAmt === null) return;
 
+            l.dayName = newDay.trim();
+            l.date = newDate.trim();
+            l.inTime = newInTime.trim();
+            l.outTime = newOutTime.trim();
             l.startCash = parseFloat(newStart) || 0;
             l.endCash = parseFloat(newEnd) || 0;
             l.visaCash = parseFloat(newVisa) || 0;
@@ -1421,7 +1452,7 @@
 
             logs[idx] = l;
             saveLogs(emp, logs);
-            alert("✅ تم تعديل سجل الدوام والمالية بنجاح!");
+            alert("✅ تم تعديل جميع بيانات الوردية بنجاح!");
             renderDashboard();
         });
     }
@@ -1484,9 +1515,9 @@
                 taskItems = `
                     <thead>
                         <tr>
-                            <th style="width:42%;">المهمة</th>
+                            <th style="width:44%;">المهمة</th>
                             <th style="width:16%;">الحالة</th>
-                            <th style="width:42%;">التقييم والملاحظة</th>
+                            <th style="width:40%;">التقييم والملاحظة</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1497,9 +1528,9 @@
                     const scorePart = `<b>${evObj.score}/10</b>`;
                     const notePart = evObj.note ? `<br><span style="font-size:9.5px;">${evObj.note}</span>` : '';
                     return `<tr>
-                        <td style="width:42%; text-align:right;">${idx + 1}. ${formatTaskLinesHtml(cleanT, idx)}</td>
+                        <td style="width:44%; text-align:right;">${idx + 1}. ${formatSingleLineText(cleanT)}</td>
                         <td style="width:16%; text-align:center;">${isDone ? 'تم' : 'لم يتم'}</td>
-                        <td style="width:42%; text-align:center;">${scorePart}${notePart}</td>
+                        <td style="width:40%; text-align:center;">${scorePart}${notePart}</td>
                     </tr>`;
                 }).join('') + `</tbody>`;
             } else {
@@ -1516,7 +1547,7 @@
                     <p style="margin:2px 0; font-size:11px; font-weight:bold;">بإدارة إياس ود. أسيل (أم ورد)</p>
                     <hr>
                     <table>
-                        <tr><td style="width:45%;"><b>التاريخ:</b></td><td>${data.date}</td></tr>
+                        ${data.dayName ? `<tr><td><b>اليوم:</b></td><td>${data.dayName}</td></tr>` : ''}<tr><td style="width:45%;"><b>التاريخ:</b></td><td>${data.date}</td></tr>
                         <tr><td><b>الموظف:</b></td><td>${data.emp}</td></tr>
                         <tr><td><b>الدخول / الخروج:</b></td><td>${data.inTime} - ${data.outTime}</td></tr>
                         <tr><td><b>بداية الكاش:</b></td><td>${data.startCash} ₪</td></tr>
