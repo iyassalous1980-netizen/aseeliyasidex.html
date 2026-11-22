@@ -417,6 +417,9 @@
 
                 <h3 style="color:#dc2626;">💵 نهاية الشفت وتسليم الكاش والفيزا والمصروفات</h3>
 
+                <label style="color:#0f766e; font-weight:bold; margin-top:8px; display:block;">🛒 المبيعات (قديش بعت خلال الوردية) (شيكل):</label>
+                <input type="number" id="salesInput" class="form-control" placeholder="مثال: 500 (إذا بعت بـ 500 وبداية الكاش 100 يصبح المتوقع بالجارور 600 بعد خصم الفيزا والمصروفات)">
+
                 <label style="color:#dc2626; font-weight:bold;">💵 الكاش النقدي الموجود بالصندوق/الجارور عند التسليم (شيكل):</label>
                 <input type="number" id="endCash" class="form-control" placeholder="مثال: 400">
 
@@ -466,7 +469,9 @@
                                 <th>إجمالي التسليم</th>
                                 <th>مطابقة الكاش</th>
                                 <th>المستحق</th>
+                                <th>فرق الساعات</th>
                                 <th>المهام وتقييم الإدارة</th>
+                                <th>الإجراءات</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -552,6 +557,7 @@
                                     <th>مطابقة الكاش</th>
                                     <th>المستحق</th>
                                     <th>النقاط</th>
+                                    <th>فرق الساعات</th>
                                     <th style="min-width:520px;">المهام الـ 20 (يمين) + تقييم إياس ود. أسيل والمتوسط (شمال)</th>
                                     <th>الإجراءات</th>
                                 </tr>
@@ -661,6 +667,65 @@
     if (!RATES['إياس']) RATES['إياس'] = 20;
     if (!PINS['سارة']) PINS['سارة'] = '66';
     if (!RATES['سارة']) RATES['سارة'] = 15;
+
+    function parseTimeToSeconds(tStr) {
+        if (!tStr) return null;
+        const clean = String(tStr).trim();
+        const isPM = /م|PM/i.test(clean);
+        const isAM = /ص|AM/i.test(clean);
+        const parts = clean.replace(/[^0-9:]/g, '').split(':').map(n => parseInt(n, 10));
+        if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) return null;
+        let h = parts[0];
+        const m = parts[1] || 0;
+        const s = parts[2] || 0;
+        if (isPM && h < 12) h += 12;
+        if (isAM && h === 12) h = 0;
+        return h * 3600 + m * 60 + s;
+    }
+
+    function getShiftTotalSeconds(record) {
+        if (typeof record.durationSeconds === 'number' && record.durationSeconds >= 0) {
+            return Math.round(record.durationSeconds);
+        }
+        const inSec = parseTimeToSeconds(record.inTime);
+        const outSec = parseTimeToSeconds(record.outTime);
+        if (inSec !== null && outSec !== null) {
+            return outSec >= inSec ? (outSec - inSec) : (86400 - inSec + outSec);
+        }
+        if (typeof record.hours === 'number' && !isNaN(record.hours)) {
+            return Math.round(record.hours * 3600);
+        }
+        return 0;
+    }
+
+    function formatHoursDiffColumn(record) {
+        const totalSec = getShiftTotalSeconds(record);
+        const decHrs = (totalSec / 3600).toFixed(2);
+        const hrs = Math.floor(totalSec / 3600);
+        const mins = Math.floor((totalSec % 3600) / 60);
+        return `${decHrs} ساعة<br><small>(${hrs}س ${mins}د)</small>`;
+    }
+
+    function calculateShiftWage(emp, startSec, endSec) {
+        if (startSec === null || endSec === null || isNaN(startSec) || isNaN(endSec)) return 0;
+        const totalSec = endSec >= startSec ? (endSec - startSec) : (86400 - startSec + endSec);
+        if (totalSec <= 0) return 0;
+
+        if (emp === 'أسيل') {
+            // من 2:00 ظهراً (14:00) إلى 4:00 عصراً (16:00): 15 شيكل/ساعة
+            // وما بعد 4:00 عصراً (16:00): 20 شيكل/ساعة
+            let pay = 0;
+            for (let s = 0; s < totalSec; s++) {
+                const tod = (startSec + s) % 86400;
+                const hourlyRate = (tod >= 14 * 3600 && tod < 16 * 3600) ? 15 : 20;
+                pay += hourlyRate / 3600;
+            }
+            return parseFloat(pay.toFixed(2));
+        }
+
+        const rate = (typeof RATES === 'object' && RATES && RATES[emp]) ? parseFloat(RATES[emp]) : (emp === 'إياس' ? 20 : 15);
+        return parseFloat(((totalSec / 3600) * rate).toFixed(2));
+    }
 
     function formatTwoLinesHtml(text) {
         return String(text || '').replace(/\n/g, '<br>');
@@ -1008,16 +1073,34 @@
 
         const visaCash = parseFloat(document.getElementById('visaCash').value) || 0;
         const expenditureCash = parseFloat(document.getElementById('expenditureCash').value) || 0;
-        const statusText = document.getElementById('cashMatchStatus').value || 'مطابق ✅';
+        const salesRaw = document.getElementById('salesInput') ? document.getElementById('salesInput').value.trim() : '';
+        const hasSales = salesRaw !== '' && !isNaN(parseFloat(salesRaw));
+        const enteredSales = hasSales ? parseFloat(salesRaw) : null;
+        let statusText = document.getElementById('cashMatchStatus').value || 'مطابق ✅';
         const shiftNotes = document.getElementById('shiftNotes').value || 'لا يوجد ملاحظات';
 
         const now = new Date();
-        const durationHrs = parseFloat(((now.getTime() - sData.timestamp) / (1000 * 60 * 60)).toFixed(2));
-        const rate = RATES[emp] || 15;
-        const amount = parseFloat((durationHrs * rate).toFixed(2));
+        const durationSeconds = Math.max(0, Math.round((now.getTime() - sData.timestamp) / 1000));
+        const durationHrs = parseFloat((durationSeconds / 3600).toFixed(2));
+        const startObj = new Date(sData.timestamp);
+        const startSec = startObj.getHours() * 3600 + startObj.getMinutes() * 60 + startObj.getSeconds();
+        const endSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+        const amount = calculateShiftWage(emp, startSec, endSec);
 
         const totalHandover = endCash + visaCash + expenditureCash;
-        const netSales = totalHandover - sData.startCash;
+        const netSales = hasSales ? enteredSales : (totalHandover - sData.startCash);
+
+        if (hasSales) {
+            const expectedDrawer = parseFloat((sData.startCash + enteredSales - visaCash - expenditureCash).toFixed(2));
+            const diff = parseFloat((endCash - expectedDrawer).toFixed(2));
+            if (Math.abs(diff) < 0.01) {
+                statusText = 'مطابق ✅';
+            } else if (diff > 0) {
+                statusText = `غير مطابق ❌ (زائد +${diff} ₪)`;
+            } else {
+                statusText = `غير مطابق ❌ (ناقص ${diff} ₪)`;
+            }
+        }
 
         let taskDetailsList = [];
         let completedList = [];
@@ -1043,6 +1126,7 @@
             inTime: sData.inTime,
             outTime: now.toLocaleTimeString('ar-EG'),
             hours: durationHrs,
+            durationSeconds: durationSeconds,
             amount: amount,
             startCash: sData.startCash,
             endCash: endCash,
@@ -1274,6 +1358,7 @@
                         <td>${matchBadge}</td>
                         <td><b>${l.amount} ₪</b></td>
                         <td><span class="points-badge">${pts} / 20</span></td>
+                        <td><span class="points-badge" style="background:#e0f2fe; color:#0369a1; border-color:#7dd3fc;">${formatHoursDiffColumn(l)}</span></td>
                         <td>
                             <div class="admin-split-wrap">
                                 <div class="admin-tasks-right">
@@ -1369,10 +1454,17 @@
                         <td style="font-weight:bold; color:purple;">${totalDelivery} ₪</td>
                         <td>${l.statusText || 'مطابق ✅'}</td>
                         <td><b>${l.amount} ₪</b></td>
+                        <td><span class="points-badge" style="background:#e0f2fe; color:#0369a1; border-color:#7dd3fc;">${formatHoursDiffColumn(l)}</span></td>
                         <td style="text-align:right;">
                             <span class="points-badge">${pts} / 20</span>
                             <div style="margin-top:4px; font-size:12px;">${tasksFormatted}</div>
                             ${evalText}
+                        </td>
+                        <td>
+                            <button class="btn btn-warning" style="width:100%; padding:4px 6px; font-size:11px; margin-bottom:3px;" onclick="editLog(${l.id}, '${l.emp}')">✏ تعديل</button>
+                            <button class="btn btn-primary" style="width:100%; padding:4px 6px; font-size:11px; margin-bottom:3px;" onclick="printLogRecord(${l.id}, '${l.emp}')">🖨 طباعة</button>
+                            <button class="btn btn-dark" style="width:100%; padding:4px 6px; font-size:11px; margin-bottom:3px;" onclick="sendPdfReport(${l.id}, '${l.emp}')">📄 نسخة PDF</button>
+                            <button class="btn btn-danger" style="width:100%; padding:4px 6px; font-size:11px;" onclick="deleteLog(${l.id}, '${l.emp}')">❌ حذف</button>
                         </td>
                     </tr>`;
                 });
@@ -1441,6 +1533,12 @@
             l.date = newDate.trim();
             l.inTime = newInTime.trim();
             l.outTime = newOutTime.trim();
+            const pIn = parseTimeToSeconds(l.inTime);
+            const pOut = parseTimeToSeconds(l.outTime);
+            if (pIn !== null && pOut !== null) {
+                l.durationSeconds = pOut >= pIn ? (pOut - pIn) : (86400 - pIn + pOut);
+                l.hours = parseFloat((l.durationSeconds / 3600).toFixed(2));
+            }
             l.startCash = parseFloat(newStart) || 0;
             l.endCash = parseFloat(newEnd) || 0;
             l.visaCash = parseFloat(newVisa) || 0;
@@ -1501,7 +1599,7 @@
         }
     }
 
-    /* طباعة / حفظ PDF شامل جدول المهام وتقييم إياس ود. أسيل والمتوسط الحسابي */
+    /* طباعة / حفظ PDF مقاس 80x80mm شامل جدول المهام وتقييم إياس ود. أسيل والمتوسط الحسابي */
     function printLogRecord(id, emp) {
         getLogs(emp, (logs) => {
             const data = logs.find(x => x.id === id);
@@ -1516,9 +1614,9 @@
                 taskItems = `
                     <thead>
                         <tr>
-                            <th style="width:50%;">المهمة</th>
+                            <th style="width:44%;">المهمة</th>
                             <th style="width:16%;">الحالة</th>
-                            <th style="width:34%;">التقييم والملاحظة</th>
+                            <th style="width:40%;">التقييم والملاحظة</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1526,12 +1624,12 @@
                     const isDone = t.includes('✅');
                     const cleanT = t.replace('[✅ تم]', '').replace('[❌ لم يتم]', '').replace('[✅]', '').replace('[❌]', '').trim();
                     const evObj = evals.find(e => e.index === idx) || { score: 0, note: '' };
-                    const scorePart = `<div><b>${evObj.score}/10</b></div>`;
-                    const notePart = evObj.note ? `<div style="font-size:10px; margin-top:2px;">${evObj.note}</div>` : '';
+                    const scorePart = `<b>${evObj.score}/10</b>`;
+                    const notePart = evObj.note ? `<br><span style="font-size:9.5px;">${evObj.note}</span>` : '';
                     return `<tr>
-                        <td style="text-align:right;">${idx + 1}. ${formatSingleLineText(cleanT)}</td>
-                        <td style="text-align:center; white-space:nowrap;">${isDone ? 'تم ✅' : 'لم يتم ❌'}</td>
-                        <td style="text-align:center;">${scorePart}${notePart}</td>
+                        <td style="width:44%; text-align:right;">${idx + 1}. ${formatSingleLineText(cleanT)}</td>
+                        <td style="width:16%; text-align:center;">${isDone ? 'تم' : 'لم يتم'}</td>
+                        <td style="width:40%; text-align:center;">${scorePart}${notePart}</td>
                     </tr>`;
                 }).join('') + `</tbody>`;
             } else {
