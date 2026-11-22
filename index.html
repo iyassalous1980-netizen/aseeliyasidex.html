@@ -1266,6 +1266,17 @@
         });
     }
 
+    function downloadPdfRecord(id, emp) {
+        getLogs(emp, (logs) => {
+            const data = logs.find(x => x.id === id);
+            if (!data) return;
+            const prevTitle = document.title;
+            document.title = `تقرير_${data.emp}_${data.date || ''}`;
+            printLogRecord(id, emp);
+            setTimeout(() => { document.title = prevTitle; }, 1000);
+        });
+    }
+
     function sendPdfReport(id, emp) {
         printLogRecord(id, emp);
     }
